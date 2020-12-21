@@ -1,1 +1,1 @@
-web: node index.js
+web: DEBUG=y*,-y:connector-message server.js

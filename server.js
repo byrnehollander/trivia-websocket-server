@@ -1,21 +1,33 @@
-const { Server } = require('ws');
+#!/usr/bin/env node
 
-const PORT = process.env.PORT || 3000;
-const INDEX = '/index.html';
+/**
+ * @type {any}
+ */
+const WebSocket = require('ws')
+const http = require('http')
+const wss = new WebSocket.Server({ noServer: true })
+const setupWSConnection = require('./utils.js').setupWSConnection
 
-const server = express()
-  .use((req, res) => res.sendFile(INDEX, { root: __dirname }))
-  .listen(PORT, () => console.log(`Listening on ${PORT}`));
+const port = process.env.PORT || 1234
 
-const wss = new Server({ server });
+const server = http.createServer((request, response) => {
+  response.writeHead(200, { 'Content-Type': 'text/plain' })
+  response.end('okay')
+})
 
-wss.on('connection', (ws) => {
-  console.log('Client connected');
-  ws.on('close', () => console.log('Client disconnected'));
-});
+wss.on('connection', setupWSConnection)
 
-setInterval(() => {
-  wss.clients.forEach((client) => {
-    client.send(new Date().toTimeString());
-  });
-}, 1000);
+server.on('upgrade', (request, socket, head) => {
+  // You may check auth of request here..
+  /**
+   * @param {any} ws
+   */
+  const handleAuth = ws => {
+    wss.emit('connection', ws, request)
+  }
+  wss.handleUpgrade(request, socket, head, handleAuth)
+})
+
+server.listen(port)
+
+console.log('running on port', port)

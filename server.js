@@ -1,33 +1,40 @@
-#!/usr/bin/env node
+const WebSocket = require('ws')
+const WebSocketJSONStream = require('@teamwork/websocket-json-stream')
+const ShareDB = require('sharedb')
 
 /**
- * @type {any}
+ * By Default Sharedb uses JSON0 OT type.
+ * To Make it compatible with our quill editor.
+ * We are using this npm package called rich-text
+ * which is based on quill delta
  */
-const WebSocket = require('ws')
-const http = require('http')
-const wss = new WebSocket.Server({ noServer: true })
-const setupWSConnection = require('./utils.js').setupWSConnection
+ShareDB.types.register(require('rich-text').type)
 
-const port = process.env.PORT || 1234
+const shareDBServer = new ShareDB()
+const connection = shareDBServer.connect()
 
-const server = http.createServer((request, response) => {
-  response.writeHead(200, { 'Content-Type': 'text/plain' })
-  response.end('okay')
-})
+/**
+ * 'documents' is collection name(table name in sql terms)
+ * 'firstDocument' is the id of the document
+ */
+const doc = connection.get('documents', 'firstDocument')
 
-wss.on('connection', setupWSConnection)
+doc.fetch(function (err) {
+  if (err) throw err
+  if (doc.type === null) {
+    /**
+     * If there is no document with id "firstDocument" in memory
+     * we are creating it and then starting up our ws server
+     */
+    doc.create([{ insert: 'Hello World!' }], 'rich-text', () => {
+      const wss = new WebSocket.Server({ port: 8888 })
 
-server.on('upgrade', (request, socket, head) => {
-  // You may check auth of request here..
-  /**
-   * @param {any} ws
-   */
-  const handleAuth = ws => {
-    wss.emit('connection', ws, request)
+      wss.on('connection', function connection (ws) {
+        // For transport we are using a ws JSON stream for communication
+        // that can read and write js objects.
+        const jsonStream = new WebSocketJSONStream(ws)
+        share.listen(jsonStream)
+      })
+    })
   }
-  wss.handleUpgrade(request, socket, head, handleAuth)
 })
-
-server.listen(port)
-
-console.log('running on port', port)
